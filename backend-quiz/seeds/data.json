@@ -1,0 +1,275 @@
+[
+  {
+    "question": "Que veut dire VEP sur les Chartreuse ?",
+    "answer": "Vieillissement Exceptionnellement Prolongé",
+    "points": 2,
+    "genre": "Spiritueux et Gastronomie",
+    "imageFile": ""
+  },
+  {
+    "question": "Combien de différence de % d'alcool entre la Chartreuse verte et la Chartreuse jaune ?",
+    "answer": 12,
+    "points": 3,
+    "genre": "Spiritueux et Gastronomie",
+    "imageFile": ""
+  },
+  {
+    "question": "Comment s'appelle cet arbitre ?",
+    "answer": "Pierluigi Collina",
+    "points": 2,
+    "genre": "Sport",
+    "imageFile": "Sport_1.webp"
+  },
+  {
+    "question": "Comment s'appelle le kop nord de l'AS Saint-Étienne ?",
+    "answer": "Magic Fans",
+    "points": 2,
+    "genre": "Football",
+    "imageFile": ""
+  },
+  {
+    "question": "Comment s'appelle la statuette mascotte ailée de Rolls-Royce ?",
+    "answer": "The Spirit of Ecstasy",
+    "points": 2,
+    "genre": "Automobile & Marques",
+    "imageFile": ""
+  },
+  {
+    "question": "Qui est Madame Marie-Françoise Roger-Dalbert ?",
+    "answer": "Ancienne maire de Saint-Genis-les-Ollières",
+    "points": 1,
+    "genre": "Politique Locale",
+    "imageFile": ""
+  },
+  {
+    "question": "Comment s'appelle l'association des sports de Saint-Genis-les-Ollières ?",
+    "answer": "ESG (Entente Saint Genoise)",
+    "points": 1,
+    "genre": "Associations & Vie Locale",
+    "imageFile": ""
+  },
+  {
+    "question": "Comment s'appelle le collège de Craponne ?",
+    "answer": "Jean Rostand",
+    "points": 1,
+    "genre": "Établissements Scolaires",
+    "imageFile": ""
+  },
+  {
+    "question": "De quelle baie le gin tire-t-il principalement son arôme ?",
+    "answer": "Baie de genièvre",
+    "points": 3,
+    "genre": "Spiritueux et Gastronomie",
+    "imageFile": ""
+  },
+  {
+    "question": "Quel pays est connu pour produire le saké traditionnel ?",
+    "answer": "Japon",
+    "points": 1,
+    "genre": "Spiritueux et Gastronomie",
+    "imageFile": ""
+  },
+  {
+    "question": "De quel pays provient la tequila ?",
+    "answer": "Mexique",
+    "points": 1,
+    "genre": "Spiritueux et Gastronomie",
+    "imageFile": ""
+  },
+  {
+    "question": "Avec quel cactus fabrique-t-on la tequila ?",
+    "answer": "Agave bleu",
+    "points": 3,
+    "genre": "Spiritueux et Gastronomie",
+    "imageFile": ""
+  },
+  {
+    "question": "De quel fruit provient l’eau-de-vie appelée Calvados ?",
+    "answer": "Pomme",
+    "points": 2,
+    "genre": "Spiritueux et Gastronomie",
+    "imageFile": ""
+  },
+  {
+    "question": "Quel alcool français est fabriqué dans la région de Cognac ?",
+    "answer": "Cognac",
+    "points": 2,
+    "genre": "Spiritueux et Gastronomie",
+    "imageFile": ""
+  },
+  {
+    "question": "Quel est l’ingrédient principal du pastis ?",
+    "answer": "Anis",
+    "points": 2,
+    "genre": "Spiritueux et Gastronomie",
+    "imageFile": ""
+  },
+  {
+    "question": "Dans quel pays est produit le bourbon ?",
+    "answer": "États-Unis",
+    "points": 2,
+    "genre": "Spiritueux et Gastronomie",
+    "imageFile": ""
+  },
+  {
+    "question": "Quelle est la marque de cette vodka ?",
+    "answer": "Vikoroff",
+    "points": 1,
+    "genre": "Spiritueux et Gastronomie",
+    "imageFile": "SpiritueuxetGastronomie_1.webp"
+  },
+  {
+    "question": "Quel bolide se cache derrière cette photo ?",
+    "answer": "Ford Ka",
+    "points": 1,
+    "genre": "Automobile",
+    "imageFile": "Automobile_1.webp"
+  },
+  {
+    "question": "Quelle est le nom de la rue du bar à bro ?",
+    "answer": "Avenue Édouard Millaud",
+    "points": 2,
+    "genre": "Vie Locale",
+    "imageFile": ""
+  },
+  {
+    "question": "Quel est le nom du commerce d'épicerie espagnole à côté du bar à bro ?",
+    "answer": "Pasion del Gusto",
+    "points": 3,
+    "genre": "Vie Locale",
+    "imageFile": ""
+  },
+  {
+    "question": "2 puissance 10 est égale à ?",
+    "answer": 1024,
+    "points": 2,
+    "genre": "Mathématiques",
+    "imageFile": ""
+  },
+  {
+    "question": "Citez deux films de Martin Scorsese",
+    "answer": "",
+    "points": 1,
+    "genre": "Cinéma",
+    "imageFile": ""
+  },
+  {
+    "question": "Quelle est la date d'anniversaire de Yannick ?",
+    "answer": "24 juillet 2002",
+    "points": 3,
+    "genre": "Groupe",
+    "imageFile": ""
+  },
+  {
+    "question": "Quelle est la date d'anniversaire de Jules ?",
+    "answer": "29 avril 2002",
+    "points": 3,
+    "genre": "Groupe",
+    "imageFile": ""
+  },
+  {
+    "question": "Quelle est la date d'anniversaire de Evan ?",
+    "answer": "25 février 2002",
+    "points": 3,
+    "genre": "Groupe",
+    "imageFile": ""
+  },
+  {
+    "question": "Quelle est la date d'anniversaire de Baptiste Riou ?",
+    "answer": "25 juillet 2002",
+    "points": 3,
+    "genre": "Groupe",
+    "imageFile": ""
+  },
+  {
+    "question": "Quelle est la date d'anniversaire de Giliann ?",
+    "answer": "12 septembre 2002",
+    "points": 3,
+    "genre": "Groupe",
+    "imageFile": ""
+  },
+  {
+    "question": "Quelle est la date d'anniversaire de Timéo ?",
+    "answer": "6 décembre 2002",
+    "points": 3,
+    "genre": "Groupe",
+    "imageFile": ""
+  },
+  {
+    "question": "Quelle est la date d'anniversaire de Antoine ?",
+    "answer": "10 décembre 2001",
+    "points": 3,
+    "genre": "Groupe",
+    "imageFile": ""
+  },
+  {
+    "question": "Quelle est la date d'anniversaire de Baptiste Rahm ?",
+    "answer": "16 juin 2002",
+    "points": 3,
+    "genre": "Groupe",
+    "imageFile": ""
+  },
+  {
+    "question": "Quelle est la date d'anniversaire de Mattéo ?",
+    "answer": "6 août 2002",
+    "points": 3,
+    "genre": "Groupe",
+    "imageFile": ""
+  },
+  {
+    "question": "Quelle est la date d'anniversaire de Edouard ?",
+    "answer": "18 décembre 2002",
+    "points": 3,
+    "genre": "Groupe",
+    "imageFile": ""
+  },
+  {
+    "question": "Comment s'appelle le fleuriste de Saint-Genis-les-Ollières ?",
+    "answer": "Les Fleurs de Monsieur Laurent",
+    "points": 2,
+    "genre": "Vie Locale",
+    "imageFile": ""
+  },
+  {
+    "question": "Comment s'appelle ce jeune trisomique (nom et prénom) ?",
+    "answer": "Vincent Smets",
+    "points": 1,
+    "genre": "Portrait",
+    "imageFile": "Portrait_1.webp"
+  },
+  {
+    "question": "Quelle est la marque de cette vodka ?",
+    "answer": "Vikoroff",
+    "points": 1,
+    "genre": "Spiritueux et Gastronomie",
+    "imageFile": "SpiritueuxetGastronomie_2.webp"
+  },
+  {
+    "question": "Quel bolide se cache derrière cette photo ?",
+    "answer": "Ford Ka",
+    "points": 1,
+    "genre": "Automobile",
+    "imageFile": "Automobile_2.webp"
+  },
+  {
+    "question": "Quelle est le nom de la rue du bar à bro ?",
+    "answer": "Avenue Édouard Millaud",
+    "points": 2,
+    "genre": "Vie Locale",
+    "imageFile": ""
+  },
+  {
+    "question": "Quel est le nom du commerce d'épicerie espagnole à côté du bar à bro ?",
+    "answer": "Pasion del Gusto",
+    "points": 3,
+    "genre": "Vie Locale",
+    "imageFile": ""
+  },
+  {
+    "question": "Quel membre du groupe a le plus gros score Snapchat ?",
+    "answer": "Jules (400k+)",
+    "points": 2,
+    "genre": "Groupe",
+    "imageFile": ""
+  }
+]

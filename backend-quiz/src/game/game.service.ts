@@ -136,15 +136,19 @@ export class GameService {
     // On prépare la liste pour le front
     const playersData = room.players.map(p => {
         const playerAnswer = answersForQuestion.find(a => a.socketId === p.socketId);
-        // On vérifie si c'est déjà validé
+        
         const validationKey = `${p.socketId}-${currentQIndex}`;
         const isValid = room.validatedAnswers.get(validationKey);
+
+        // CORRECTION : On vérifie si l'objet existe ET si le texte n'est pas vide (après nettoyage des espaces)
+        const hasContent = playerAnswer && playerAnswer.answer && playerAnswer.answer.trim().length > 0;
 
         return {
             socketId: p.socketId,
             name: p.name,
-            answer: playerAnswer ? playerAnswer.answer : "(Pas de réponse)",
-            isCorrect: isValid // undefined, true, ou false
+            // Si du contenu : on l'affiche. Sinon : texte par défaut.
+            answer: hasContent ? playerAnswer.answer : "(Pas de réponse)",
+            isCorrect: isValid
         };
     });
 
@@ -221,7 +225,7 @@ export class GameService {
     if (!room) return;
 
     // 1. Récupérer 20 questions aléatoires
-    room.questions = await this.questionsService.fetchRandomQuestions(3);
+    room.questions = await this.questionsService.fetchRandomQuestions(10);
     room.status = 'playing';
     room.currentQuestionIndex = 0;
 

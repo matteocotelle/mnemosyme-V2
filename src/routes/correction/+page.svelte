@@ -88,8 +88,8 @@
                     <button 
                         disabled={!$game.isCreator}
                         on:click={() => togglePlayer(player.socketId)}
-                        class="relative w-full text-left group transition-all duration-200 active:scale-95"
-                    >
+                        class="relative w-full text-left group transition-all duration-200 active:scale-95 
+                        {player.isDisconnected ? 'opacity-50 grayscale' : ''}" >
                         <div class="
                             flex items-center justify-between p-4 rounded-xl border-2 shadow-lg transition-colors
                             {player.isCorrect === true ? 'bg-green-900/40 border-green-500' : 
@@ -99,6 +99,10 @@
                             <div class="flex-grow">
                                 <div class="flex items-center gap-2 mb-1">
                                     <span class="font-bold text-slate-200">{player.name}</span>
+                                    {#if player.isDisconnected}
+                                        <span class="text-[10px] bg-slate-600 text-white px-1.5 py-0.5 rounded border border-slate-500">OFFLINE</span>
+                                    {/if}
+
                                     {#if player.socketId === $game.creatorSocketId}
                                         <span class="text-xs bg-yellow-500/20 text-yellow-500 px-1 rounded">Hôte</span>
                                     {/if}

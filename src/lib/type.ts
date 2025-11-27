@@ -10,6 +10,7 @@ export interface Player {
     socketId: string;
     name: string;
     isCreator?: boolean; // On ajoutera cette propriété côté front pour simplifier l'affichage
+    isDisconnected?: boolean;
 }
 
 export interface Question {

@@ -28,7 +28,7 @@ export class QuestionsService {
     this.s3Client = new S3Client(awsConfig);
   }
 
-  async fetchRandomQuestions(count: number = 20) {
+  async fetchRandomQuestions(count: number = 3) {
     try {
       const command = new ScanCommand({ TableName: this.tableName });
       const response = await this.docClient.send(command);

@@ -39,18 +39,23 @@ export class GameGateway implements OnGatewayConnection, OnGatewayDisconnect, On
   handleDisconnect(client: Socket) {
     console.log(`Client déconnecté: ${client.id}`);
     
-    // On retire le joueur et on récupère l'ID de sa salle
     const roomId = this.gameService.removePlayer(client.id);
 
-    // Si le joueur était dans une salle qui existe encore, on prévient les survivants
     if (roomId) {
       const room = this.gameService.getRoom(roomId);
       if (room) {
+        // Mise à jour du Lobby (si on est dans le lobby)
         this.server.to(roomId).emit('roomData', {
           roomId: room.id,
           players: room.players,
           creatorSocketId: room.creatorSocketId
         });
+
+        // FIX FANTÔME : Si on est en correction, on force une mise à jour immédiate
+        // pour que le joueur apparaisse "Grisé/Offline" tout de suite
+        if (room.status === 'correction') {
+           this.gameService.sendCorrectionData(roomId);
+        }
       }
     }
   }
@@ -133,10 +138,10 @@ export class GameGateway implements OnGatewayConnection, OnGatewayDisconnect, On
 
   @SubscribeMessage('submitAnswer')
   handleSubmitAnswer(
-    @MessageBody() data: { roomId: string, answer: string }, 
+    @MessageBody() data: { roomId: string, answer: string, questionIndex?: number }, 
     @ConnectedSocket() client: Socket
   ) {
-    this.gameService.submitAnswer(data.roomId, client.id, data.answer);
+    this.gameService.submitAnswer(data.roomId, client.id, data.answer, data.questionIndex);
   }
 
   @SubscribeMessage('toggleValidation')

@@ -2,6 +2,7 @@ export interface Player {
   socketId: string;
   name: string;
   score: number;
+  isDisconnected?: boolean;
 }
 
 export interface PlayerAnswer {

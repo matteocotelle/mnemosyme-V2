@@ -32,7 +32,7 @@
     "answer": "The Spirit of Ecstasy",
     "points": 2,
     "genre": "Automobile & Marques",
-    "imageFile": ""
+    "imageFile": "Automobile_1.webp"
   },
   {
     "question": "Qui est Madame Marie-Françoise Roger-Dalbert ?",
@@ -123,19 +123,12 @@
     "answer": "Ford Ka",
     "points": 1,
     "genre": "Automobile",
-    "imageFile": "Automobile_1.webp"
+    "imageFile": "Automobile_2.webp"
   },
   {
     "question": "Quelle est le nom de la rue du bar à bro ?",
     "answer": "Avenue Édouard Millaud",
     "points": 2,
-    "genre": "Vie Locale",
-    "imageFile": ""
-  },
-  {
-    "question": "Quel est le nom du commerce d'épicerie espagnole à côté du bar à bro ?",
-    "answer": "Pasion del Gusto",
-    "points": 3,
     "genre": "Vie Locale",
     "imageFile": ""
   },
@@ -238,25 +231,11 @@
     "imageFile": "Portrait_1.webp"
   },
   {
-    "question": "Quelle est la marque de cette vodka ?",
-    "answer": "Vikoroff",
+    "question": "À quoi cette vodka est-elle aromatisée ?",
+    "answer": "Mango (hichem)",
     "points": 1,
     "genre": "Spiritueux et Gastronomie",
     "imageFile": "SpiritueuxetGastronomie_2.webp"
-  },
-  {
-    "question": "Quel bolide se cache derrière cette photo ?",
-    "answer": "Ford Ka",
-    "points": 1,
-    "genre": "Automobile",
-    "imageFile": "Automobile_2.webp"
-  },
-  {
-    "question": "Quelle est le nom de la rue du bar à bro ?",
-    "answer": "Avenue Édouard Millaud",
-    "points": 2,
-    "genre": "Vie Locale",
-    "imageFile": ""
   },
   {
     "question": "Quel est le nom du commerce d'épicerie espagnole à côté du bar à bro ?",
@@ -271,5 +250,62 @@
     "points": 2,
     "genre": "Groupe",
     "imageFile": ""
+  },
+  {
+    "question": "Quel est la date de décès de Jean Pormanove",
+    "answer": "18 août 2025",
+    "points": 3,
+    "genre": "Influcenceur",
+    "imageFile": "Portrait_3.webp"
+  },
+  {
+    "question": "Qui est ce ?",
+    "answer": "Faker",
+    "points": 1,
+    "genre": "Portrait",
+    "imageFile": "Portrait_2.webp"
+  },
+  {
+    "question": "Quelle est le vrai nom de Jean Pormanove ?",
+    "answer": "Raphaël Graven",
+    "points": 2,
+    "genre": "Portrait",
+    "imageFile": "Portrait_8.webp"
+  },
+  {
+    "question": "Qui est ce ?",
+    "answer": "Lionel Messi",
+    "points": 3,
+    "genre": "Portrait",
+    "imageFile": "Portrait_4.webp"
+  },
+  {
+    "question": "Qui est ce ?",
+    "answer": "Arthur Fils",
+    "points": 1,
+    "genre": "Portrait",
+    "imageFile": "Portrait_5.webp"
+  },
+  {
+    "question": "Qui est ce ?",
+    "answer": "Neymar",
+    "points": 2,
+    "genre": "Portrait",
+    "imageFile": "Portrait_6.webp"
+  },
+  {
+    "question": "Qui est ce ?",
+    "answer": "Alexander Zverev",
+    "points": 1,
+    "genre": "Portrait",
+    "imageFile": "Portrait_7.webp"
+  },
+  {
+    "question": "Dans quelle établissement a été prise cette photo",
+    "answer": "La mer égée",
+    "points": 2,
+    "genre": "Lieu",
+    "imageFile": "Lieu_1.webp"
   }
 ]
+

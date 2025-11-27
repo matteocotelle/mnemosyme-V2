@@ -159,15 +159,15 @@
         {#if showList && allPlayers.length > 0}
             <div class="w-full max-w-md space-y-2 mb-32">
                 <h3 class="text-center text-slate-500 text-sm uppercase mb-4" in:fade>Tableau Complet</h3>
-                
                 {#each allPlayers as player, i}
                     <div 
                         in:fly={{ 
-                            x: -100, // Arrive depuis la gauche
-                            duration: 400, // Durée du mouvement
-                            delay: (allPlayers.length - 1 - i) * 50 // Apparition en cascade inversée (très rapide: 50ms)
+                            x: -100, 
+                            duration: 400, 
+                            delay: (allPlayers.length - 1 - i) * 50 
                         }}
                         class="flex items-center justify-between p-4 rounded-xl border border-white/5 
+                        {player.isDisconnected ? 'opacity-50 grayscale' : ''} 
                         {i === 0 ? 'bg-yellow-500/20 border-yellow-500/50' : 
                          i === 1 ? 'bg-slate-500/20 border-slate-400/30' : 
                          i === 2 ? 'bg-amber-700/20 border-amber-600/30' : 
@@ -182,10 +182,15 @@
                                 #{i + 1}
                             </span>
                             
-                            <span class="font-bold truncate max-w-[150px]">{player.name}</span>
+                            <div class="flex flex-col">
+                                <span class="font-bold truncate max-w-[150px]">{player.name}</span>
+                                {#if player.isDisconnected}
+                                    <span class="text-[10px] text-slate-400 uppercase font-bold tracking-wide">Déconnecté</span>
+                                {/if}
+                            </div>
                             
                             {#if player.socketId === $game.creatorSocketId}
-                                <span class="text-[10px] bg-yellow-500/10 text-yellow-500 px-1.5 py-0.5 rounded border border-yellow-500/20">Hôte</span>
+                                <span class="text-[10px] bg-yellow-500/10 text-yellow-500 px-1.5 py-0.5 rounded border border-yellow-500/20 self-start">Hôte</span>
                             {/if}
                         </div>
 

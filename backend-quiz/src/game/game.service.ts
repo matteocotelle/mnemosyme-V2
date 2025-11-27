@@ -36,9 +36,18 @@ export class GameService {
   joinRoom(roomId: string, clientSocketId: string, pseudo: string): Room | null {
     const room = this.rooms.get(roomId);
     if (!room) return null;
-    if (room.status !== 'lobby') return null; // Impossible de rejoindre si déjà commencé
+
+    const existingPlayer = room.players.find(p => p.name === pseudo && p.isDisconnected);
+    
+    // Si la partie a commencé ET que ce n'est pas une reconnexion, on bloque
+    if (room.status !== 'lobby' && !existingPlayer) return null;
 
     this.addPlayerToRoom(room, clientSocketId, pseudo);
+    
+    // Si le joueur revient, on enlève le flag déconnecté
+    const player = room.players.find(p => p.socketId === clientSocketId);
+    if (player) delete player.isDisconnected;
+
     return room;
   }
 
@@ -57,26 +66,37 @@ export class GameService {
   }
 
   removePlayer(socketId: string): string | null {
-    // On cherche dans quelle salle est ce socket
     for (const [roomId, room] of this.rooms.entries()) {
       const playerIndex = room.players.findIndex(p => p.socketId === socketId);
       
       if (playerIndex !== -1) {
-        // 1. On retire le joueur
-        room.players.splice(playerIndex, 1);
+        const player = room.players[playerIndex];
 
-        // 2. Si la salle est vide, on la supprime
-        if (room.players.length === 0) {
-          this.rooms.delete(roomId);
-          return null; // Plus personne à prévenir
+        // CAS 1 : LOBBY -> On supprime
+        if (room.status === 'lobby') {
+            room.players.splice(playerIndex, 1);
+            if (room.players.length === 0) {
+                this.rooms.delete(roomId);
+                return null;
+            }
+        } 
+        // CAS 2 : JEU/CORRECTION -> On garde (Fantôme)
+        else {
+            player.isDisconnected = true;
         }
 
-        // 3. Si le créateur est parti, on promeut le joueur suivant
+        // Gestion transmission du rôle Hôte
         if (room.creatorSocketId === socketId) {
-          room.creatorSocketId = room.players[0].socketId;
+            const nextCreator = room.players.find(p => !p.isDisconnected && p.socketId !== socketId);
+            if (nextCreator) {
+                room.creatorSocketId = nextCreator.socketId;
+            } else if (room.players.length > 0) {
+                room.creatorSocketId = room.players[0].socketId;
+            } else {
+                this.rooms.delete(roomId);
+                return null;
+            }
         }
-
-        // 4. On renvoie l'ID de la salle pour prévenir les autres
         return roomId;
       }
     }
@@ -201,7 +221,7 @@ export class GameService {
     if (!room) return;
 
     // 1. Récupérer 20 questions aléatoires
-    room.questions = await this.questionsService.fetchRandomQuestions(6);
+    room.questions = await this.questionsService.fetchRandomQuestions(3);
     room.status = 'playing';
     room.currentQuestionIndex = 0;
 
@@ -252,35 +272,41 @@ export class GameService {
     }, 1000);
   }
 
-  submitAnswer(roomId: string, socketId: string, answer: string) {
+  submitAnswer(roomId: string, socketId: string, answer: string, questionIndex?: number) {
     const room = this.rooms.get(roomId);
     if (!room || room.status !== 'playing') return;
+
+    console.log(`📥 BACK REÇOIT [Joueur ${socketId}] :`, {
+        reponse: answer,
+        indexRecu: questionIndex,
+        indexActuelRoom: room.currentQuestionIndex
+    });
     
-    // On stocke la réponse (on traitera la correction plus tard ou maintenant)
-    // Structure simple pour l'instant : on stocke dans une map temporaire dans la room
-    if (!room.answers) room.answers = []; // Initialiser si besoin
+    if (!room.answers) room.answers = [];
     
-    // On enregistre : { questionIndex, playerId, answer }
+    // CORRECTION : On utilise l'index envoyé par le front s'il existe
+    // Sinon on prend l'actuel (fallback)
+    const targetIndex = (questionIndex !== undefined) ? questionIndex : room.currentQuestionIndex;
+
+    // On vérifie si le joueur n'a pas déjà répondu à CETTE question précise
+    const alreadyAnswered = room.answers.some(a => a.socketId === socketId && a.questionIndex === targetIndex);
+    if (alreadyAnswered) return;
+
     room.answers.push({
-      questionIndex: room.currentQuestionIndex,
+      questionIndex: targetIndex, // On enregistre avec le BON index
       socketId,
       answer
     });
-    
-    // Feedback optionnel au joueur "Réponse reçue"
   }
 
   private closeQuestion(roomId: string) {
     const room = this.rooms.get(roomId);
     if (!room) return;
-
-    // Ici on pourrait calculer les points tout de suite, 
-    // mais tu as dit "correction à la fin". 
-    // Donc on passe juste à la suite.
     
-    room.currentQuestionIndex++;
-    // Petit délai entre les questions (2s)
-    setTimeout(() => this.nextQuestion(roomId), 2000); 
+    setTimeout(() => {
+        room.currentQuestionIndex++; 
+        this.nextQuestion(roomId);
+    }, 2000);
   }
 
   private endGame(roomId: string) {

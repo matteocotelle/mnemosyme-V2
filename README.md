@@ -1,38 +1,35 @@
-# sv
+🧠 Mnemosyme — V2
 
-Everything you need to build a Svelte project, powered by [`sv`](https://github.com/sveltejs/cli).
+Un jeu de quiz moderne, rapide et fun, construit avec Svelte, TailwindCSS et NestJS.
 
-## Creating a project
+<p align="center" <img src="src/lib/assets/favicon.png" alt="Mnemosyme Logo" width="160"> </p>
+🚀 À propos du projet
 
-If you're seeing this, you've probably already done this step. Congrats!
+Mnemosyme est une application de quiz en ligne orientée rapidité, fluidité et simplicité d’utilisation.
+Cette V2 apporte une interface modernisée, entièrement responsive, des animations fluides, et une API robuste.
 
-```sh
-# create a new project in the current directory
-npx sv create
+Stack technique :
 
-# create a new project in my-app
-npx sv create my-app
-```
+🖥️ Svelte — interface ultra-réactive
 
-## Developing
+🎨 TailwindCSS — style cohérent et rapide
 
-Once you've created a project and installed dependencies with `npm install` (or `pnpm install` or `yarn`), start a development server:
+⚙️ NestJS — backend modulaire et scalable
 
-```sh
-npm run dev
+☁️ DynamoDB & S3 — stockage performant des questions et médias
 
-# or start the server and open the app in a new browser tab
-npm run dev -- --open
-```
+✨ Fonctionnalités
 
-## Building
+🎯 Quiz en temps réel
 
-To create a production version of your app:
+🔊 Sons interactifs (clic, validations…)
 
-```sh
-npm run build
-```
+🖼️ Questions avec ou sans images
 
-You can preview the production build with `npm run preview`.
+📱 Interface entièrement responsive
 
-> To deploy your app, you may need to install an [adapter](https://svelte.dev/docs/kit/adapters) for your target environment.
+⚡ Performance maximale grâce à Svelte
+
+🗄️ API sécurisée et propre
+
+🛠️ Scripts d'import automatique (CSV → DynamoDB + S3)

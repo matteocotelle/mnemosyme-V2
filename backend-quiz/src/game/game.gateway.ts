@@ -1,178 +1,297 @@
-import { 
-  WebSocketGateway, 
-  SubscribeMessage, 
-  MessageBody, 
-  ConnectedSocket, 
+import {
+  WebSocketGateway,
+  SubscribeMessage,
+  MessageBody,
+  ConnectedSocket,
   WebSocketServer,
   OnGatewayConnection,
   OnGatewayDisconnect,
-  OnGatewayInit // Nécessaire pour afterInit
+  OnGatewayInit,
 } from '@nestjs/websockets';
 import { Server, Socket } from 'socket.io';
-import { GameService } from './game.service';
+import { RoomService } from './services/room.service';
+import { GameFlowService } from './services/game-flow.service';
+import { CorrectionService } from './services/correction.service';
+import { ReconnectionService } from './services/reconnection.service';
+import { CategoryCacheService } from '../questions/category-cache.service';
+import { CHAT_MAX_LENGTH } from './game.constants';
+import type { Room } from './interfaces/game.interfaces';
+import type {
+  CreateRoomPayload,
+  JoinRoomPayload,
+  UpdateGameSettingsPayload,
+  StartGamePayload,
+  SubmitAnswerPayload,
+  ToggleValidationPayload,
+  ValidateAllPayload,
+  NextCorrectionPayload,
+  RestartGamePayload,
+  ChatMessagePayload,
+  RequestRoomDataPayload,
+  RoomDataEvent,
+} from './interfaces/events.interfaces';
 
 @WebSocketGateway({
   cors: {
-    origin: process.env.FRONTEND_URL || '*', // L'adresse de ton Front Svelte
-    credentials: true
+    origin: process.env.FRONTEND_URL || '*',
+    credentials: true,
   },
 })
 export class GameGateway implements OnGatewayConnection, OnGatewayDisconnect, OnGatewayInit {
-  
   @WebSocketServer()
   server: Server;
 
-  constructor(private gameService: GameService) {}
+  constructor(
+    private readonly roomService: RoomService,
+    private readonly gameFlowService: GameFlowService,
+    private readonly correctionService: CorrectionService,
+    private readonly reconnectionService: ReconnectionService,
+    private readonly categoryCacheService: CategoryCacheService,
+  ) {}
 
-  // --- INITIALISATION ---
-  // Cette méthode est appelée automatiquement quand le module Websocket démarre
   afterInit(server: Server) {
-    // On injecte l'instance du serveur Socket.io dans le Service
-    // Cela permet au Service d'envoyer des messages (emit) sans passer par le Gateway
-    this.gameService.server = server;
+    this.gameFlowService.server = server;
+    this.correctionService.server = server;
   }
 
   handleConnection(client: Socket) {
-    console.log(`Client connecté: ${client.id}`);
+    console.log(`✅ Client connecté: ${client.id}`);
   }
 
   handleDisconnect(client: Socket) {
-    console.log(`Client déconnecté: ${client.id}`);
-    
-    const roomId = this.gameService.removePlayer(client.id);
+    console.log(`🔴 Client déconnecté: ${client.id}`);
 
-    if (roomId) {
-      const room = this.gameService.getRoom(roomId);
-      if (room) {
-        // Mise à jour du Lobby (si on est dans le lobby)
-        this.server.to(roomId).emit('roomData', {
-          roomId: room.id,
-          players: room.players,
-          creatorSocketId: room.creatorSocketId
-        });
+    const result = this.roomService.removePlayer(client.id);
+    if (!result) return;
 
-        // FIX FANTÔME : Si on est en correction, on force une mise à jour immédiate
-        // pour que le joueur apparaisse "Grisé/Offline" tout de suite
-        if (room.status === 'correction') {
-           this.gameService.sendCorrectionData(roomId);
-        }
-      }
+    const { roomId, room } = result;
+    this.broadcastRoomData(room);
+
+    if (room.phase === 'correction') {
+      this.correctionService.sendCorrectionData(roomId);
     }
   }
 
-  // --- ÉVÉNEMENTS DU JEU ---
+  // --- Room Management ---
 
   @SubscribeMessage('createRoom')
-  handleCreateRoom(
-    @MessageBody() data: { pseudo: string },
+  async handleCreateRoom(
+    @MessageBody() data: CreateRoomPayload,
     @ConnectedSocket() client: Socket,
   ) {
-    const room = this.gameService.createRoom(client.id, data.pseudo);
-    
-    // 1. On fait rejoindre la socket rooms
-    client.join(room.id);
-    
-    // 2. On répond au créateur
-    client.emit('roomCreated', { roomId: room.id });
-    
-    // 3. On met à jour l'affichage
-    this.server.to(room.id).emit('roomData', {
-      roomId: room.id,
-      players: room.players,
-      creatorSocketId: room.creatorSocketId
-    });
-  }
-
-  @SubscribeMessage('joinRoom')
-  handleJoinRoom(
-    @MessageBody() data: { roomId: string; pseudo: string },
-    @ConnectedSocket() client: Socket,
-  ) {
-    // Support pour "name" ou "pseudo" selon ton front
-    const pseudo = data.pseudo || (data as any).name;
-
-    const room = this.gameService.joinRoom(data.roomId, client.id, pseudo);
+    const room = this.roomService.createRoom(client.id, data.pseudo, data.avatar);
 
     if (!room) {
-      client.emit('errorMsg', 'Salle introuvable ou partie commencée');
+      client.emit('errorMsg', 'Nombre maximum de salons atteint');
       return;
     }
 
     client.join(room.id);
-    
-    client.emit('roomJoined', { roomId: room.id });
+    client.emit('roomCreated', { roomId: room.id });
+    this.broadcastRoomData(room);
 
-    this.server.to(room.id).emit('roomData', {
-      roomId: room.id,
-      players: room.players,
-      creatorSocketId: room.creatorSocketId
-    });
+    // Send available categories
+    const categories = await this.categoryCacheService.getCategories();
+    client.emit('availableCategories', { categories });
   }
 
-  @SubscribeMessage('requestRoomData')
-  handleRequestRoomData(
-    @MessageBody() data: { roomId: string },
+  @SubscribeMessage('joinRoom')
+  handleJoinRoom(
+    @MessageBody() data: JoinRoomPayload,
     @ConnectedSocket() client: Socket,
   ) {
-    const room = this.gameService.getRoom(data.roomId);
-    
-    if (room) {
-      client.emit('roomData', {
-        roomId: room.id,
-        players: room.players,
-        creatorSocketId: room.creatorSocketId
+    const pseudo = data.pseudo || data.name || '';
+    const result = this.roomService.joinRoom(data.roomId, client.id, pseudo, data.avatar);
+
+    if (!result) {
+      client.emit('errorMsg', 'Salle introuvable, pleine ou partie commencée');
+      return;
+    }
+
+    const { room, player, isReconnection } = result;
+    client.join(room.id);
+    client.emit('roomJoined', { roomId: room.id });
+    this.broadcastRoomData(room);
+
+    if (isReconnection) {
+      // Send current state snapshot to reconnecting player
+      const snapshot = this.reconnectionService.buildStateSnapshot(room);
+      client.emit('reconnectionState', snapshot);
+
+      // Notify others
+      this.server.to(room.id).emit('playerReconnected', {
+        socketId: player.socketId,
+        playerName: player.name,
       });
     }
   }
 
-  // --- NOUVELLES MÉTHODES AJOUTÉES ---
+  @SubscribeMessage('requestRoomData')
+  handleRequestRoomData(
+    @MessageBody() data: RequestRoomDataPayload,
+    @ConnectedSocket() client: Socket,
+  ) {
+    const room = this.roomService.getRoom(data.roomId);
+    if (!room) return;
+
+    const roomData = this.buildRoomDataEvent(room);
+    client.emit('roomData', roomData);
+  }
+
+  // --- Game Settings ---
+
+  @SubscribeMessage('updateGameSettings')
+  async handleUpdateGameSettings(
+    @MessageBody() data: UpdateGameSettingsPayload,
+    @ConnectedSocket() client: Socket,
+  ) {
+    const room = this.roomService.getRoom(data.roomId);
+    if (!room) return;
+    if (!this.assertCreator(room, client)) return;
+    if (room.phase !== 'lobby') return;
+
+    this.roomService.updateSettings(room, data.settings);
+    this.roomService.touchRoom(room);
+
+    this.server.to(room.id).emit('gameSettings', { settings: room.settings });
+  }
+
+  @SubscribeMessage('requestCategories')
+  async handleRequestCategories(
+    @ConnectedSocket() client: Socket,
+  ) {
+    const categories = await this.categoryCacheService.getCategories();
+    client.emit('availableCategories', { categories });
+  }
+
+  // --- Game Flow ---
 
   @SubscribeMessage('startGame')
   handleStartGame(
-    @MessageBody() data: { roomId: string }, 
-    @ConnectedSocket() client: Socket
+    @MessageBody() data: StartGamePayload,
+    @ConnectedSocket() client: Socket,
   ) {
-    // Idéalement, on devrait vérifier ici ou dans le service si client.id est bien le créateur
-    this.gameService.startGame(data.roomId); 
+    const room = this.roomService.getRoom(data.roomId);
+    if (!room) return;
+    if (!this.assertCreator(room, client)) return;
+
+    this.gameFlowService.startGame(data.roomId);
   }
 
   @SubscribeMessage('submitAnswer')
   handleSubmitAnswer(
-    @MessageBody() data: { roomId: string, answer: string, questionIndex?: number }, 
-    @ConnectedSocket() client: Socket
+    @MessageBody() data: SubmitAnswerPayload,
+    @ConnectedSocket() client: Socket,
   ) {
-    this.gameService.submitAnswer(data.roomId, client.id, data.answer, data.questionIndex);
+    this.gameFlowService.submitAnswer(data.roomId, client.id, data.answer, data.questionIndex);
   }
+
+  // --- Correction ---
 
   @SubscribeMessage('toggleValidation')
   handleToggleValidation(
-    @MessageBody() data: { roomId: string, targetSocketId: string },
-    @ConnectedSocket() client: Socket
+    @MessageBody() data: ToggleValidationPayload,
+    @ConnectedSocket() client: Socket,
   ) {
-    // Sécurité : vérifier si client.id === creatorSocketId (optionnel mais mieux)
-    this.gameService.toggleValidation(data.roomId, data.targetSocketId);
+    const room = this.roomService.getRoom(data.roomId);
+    if (!room) return;
+    if (!this.assertCreator(room, client)) return;
+
+    this.correctionService.toggleValidation(data.roomId, data.targetSocketId);
+  }
+
+  @SubscribeMessage('validateAll')
+  handleValidateAll(
+    @MessageBody() data: ValidateAllPayload,
+    @ConnectedSocket() client: Socket,
+  ) {
+    const room = this.roomService.getRoom(data.roomId);
+    if (!room) return;
+    if (!this.assertCreator(room, client)) return;
+
+    this.correctionService.validateAllPlayers(data.roomId, data.isCorrect);
   }
 
   @SubscribeMessage('nextCorrection')
   handleNextCorrection(
-    @MessageBody() data: { roomId: string },
-    @ConnectedSocket() client: Socket
+    @MessageBody() data: NextCorrectionPayload,
+    @ConnectedSocket() client: Socket,
   ) {
-    this.gameService.nextCorrection(data.roomId);
+    const room = this.roomService.getRoom(data.roomId);
+    if (!room) return;
+    if (!this.assertCreator(room, client)) return;
+
+    this.correctionService.nextCorrection(data.roomId);
   }
-  
-  // Ajoute aussi un écouteur pour charger la correction si on refresh la page
+
   @SubscribeMessage('requestCorrectionData')
-  handleRequestCorrection(@MessageBody() data: { roomId: string }) {
-     this.gameService.sendCorrectionData(data.roomId);
+  handleRequestCorrectionData(
+    @MessageBody() data: RequestRoomDataPayload,
+  ) {
+    this.correctionService.sendCorrectionData(data.roomId);
   }
+
+  // --- Restart ---
 
   @SubscribeMessage('restartGame')
   handleRestartGame(
-    @MessageBody() data: { roomId: string },
-    @ConnectedSocket() client: Socket
+    @MessageBody() data: RestartGamePayload,
+    @ConnectedSocket() client: Socket,
   ) {
-    // Idéalement vérifier si c'est le créateur
-    this.gameService.restartGame(data.roomId);
+    const room = this.roomService.getRoom(data.roomId);
+    if (!room) return;
+    if (!this.assertCreator(room, client)) return;
+
+    this.roomService.restartGame(room);
+    this.server.to(room.id).emit('gameRestarted');
+    this.broadcastRoomData(room);
+  }
+
+  // --- Chat ---
+
+  @SubscribeMessage('chatMessage')
+  handleChatMessage(
+    @MessageBody() data: ChatMessagePayload,
+    @ConnectedSocket() client: Socket,
+  ) {
+    const room = this.roomService.getRoom(data.roomId);
+    if (!room) return;
+
+    // Chat active during lobby and result only
+    if (room.phase !== 'lobby' && room.phase !== 'result') return;
+
+    const player = room.players.find(p => p.socketId === client.id);
+    if (!player) return;
+
+    this.server.to(data.roomId).emit('newChatMessage', {
+      pseudo: player.name,
+      avatar: player.avatar,
+      message: data.message.slice(0, CHAT_MAX_LENGTH),
+      timestamp: Date.now(),
+    });
+  }
+
+  // --- Helpers ---
+
+  private assertCreator(room: Room, client: Socket): boolean {
+    if (!this.roomService.isCreator(room, client.id)) {
+      client.emit('errorMsg', 'Seul le créateur peut effectuer cette action');
+      return false;
+    }
+    return true;
+  }
+
+  private buildRoomDataEvent(room: Room): RoomDataEvent {
+    return {
+      roomId: room.id,
+      players: room.players,
+      creatorSocketId: room.creatorSocketId,
+      phase: room.phase,
+      settings: room.settings,
+    };
+  }
+
+  private broadcastRoomData(room: Room): void {
+    this.server.to(room.id).emit('roomData', this.buildRoomDataEvent(room));
   }
 }

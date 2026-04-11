@@ -5,24 +5,33 @@ export default {
 	theme: {
 		extend: {
 			colors: {
-				// Nos couleurs personnalisées
-				brand: {
-					dark: '#0f172a',    // Fond principal (Slate 900)
-					primary: '#6366f1', // Indigo (Bouton principal)
-					secondary: '#ec4899', // Pink (Bouton secondaire)
-					accent: '#8b5cf6'   // Violet (Accents)
-				}
+				background: '#141726',
+				surface: {
+					DEFAULT: '#1E2237',
+					light: '#262B44',
+				},
+				primary: '#FF5E5B',
+				secondary: '#FFCD38',
+				accent: '#48BFE3',
+				'text-primary': '#F0F0F5',
+				'text-muted': '#8B8CA0',
+				success: '#34D399',
+				error: '#F87171',
+			},
+			fontFamily: {
+				heading: ['Space Grotesk', 'sans-serif'],
+				body: ['Inter', 'sans-serif'],
 			},
 			animation: {
-				'float': 'float 6s ease-in-out infinite',
+				'pulse-dot': 'pulse-dot 1.5s ease-in-out infinite',
 			},
 			keyframes: {
-				float: {
-					'0%, 100%': { transform: 'translateY(0)' },
-					'50%': { transform: 'translateY(-10px)' },
-				}
-			}
-		}
+				'pulse-dot': {
+					'0%, 100%': { opacity: '1' },
+					'50%': { opacity: '0.3' },
+				},
+			},
+		},
 	},
-	plugins: []
+	plugins: [],
 } satisfies Config;

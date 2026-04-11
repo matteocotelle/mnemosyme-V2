@@ -1,5 +1,10 @@
 node_modules
 
+# Claude Code
+.agents/
+.claude/
+skills-lock.json
+
 # Output
 .output
 .vercel

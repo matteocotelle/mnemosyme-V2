@@ -1,75 +1,142 @@
 import { Injectable } from '@nestjs/common';
-import { DynamoDBClient } from '@aws-sdk/client-dynamodb';
-import { DynamoDBDocumentClient, ScanCommand } from '@aws-sdk/lib-dynamodb';
-import { S3Client, GetObjectCommand } from '@aws-sdk/client-s3'; // Nouveaux imports
-import { getSignedUrl } from '@aws-sdk/s3-request-presigner';   // Nouveau import
+import { createClient, SupabaseClient } from '@supabase/supabase-js';
+import type { Question } from './questions.interfaces';
 
 @Injectable()
 export class QuestionsService {
-  private readonly docClient: DynamoDBDocumentClient;
-  private readonly s3Client: S3Client; // Client S3
-  private readonly tableName = process.env.QUESTIONS_TABLE || 'QuestionsQuiz';
-  private readonly bucketName = process.env.AWS_BUCKET_NAME || 'quiz-app-media-7730-7944-5629'; // Ajoute ça dans ton .env
+  private readonly supabase: SupabaseClient;
+  private readonly bucketName: string;
 
   constructor() {
-    // Configuration commune (utilise les credentials du .env automatiquement)
-    const awsConfig = {
-        region: process.env.AWS_REGION || 'eu-north-1',
-        credentials: {
-            accessKeyId: process.env.AWS_ACCESS_KEY_ID || '',
-            secretAccessKey: process.env.AWS_SECRET_ACCESS_KEY || ''
-        }
-    };
-
-    const dbClient = new DynamoDBClient(awsConfig); 
-    this.docClient = DynamoDBDocumentClient.from(dbClient);
-    
-    // Initialisation S3
-    this.s3Client = new S3Client(awsConfig);
+    this.supabase = createClient(
+      process.env.SUPABASE_URL || '',
+      process.env.SUPABASE_SERVICE_ROLE_KEY || '',
+    );
+    this.bucketName = process.env.SUPABASE_BUCKET || 'quiz-media';
   }
 
-  async fetchRandomQuestions(count: number = 10) {
+  /**
+   * Fetch random questions with optional category filter and exclusion list.
+   * Uses a Postgres function for efficient random selection.
+   */
+  async fetchRandomQuestions(
+    count: number = 10,
+    categories: string[] = [],
+    excludeIds: string[] = [],
+  ): Promise<Question[]> {
     try {
-      const command = new ScanCommand({ TableName: this.tableName });
-      const response = await this.docClient.send(command);
-      
-      let items = response.Items || [];
-      
-      // Mélange (Fisher-Yates)
-      for (let i = items.length - 1; i > 0; i--) {
-        const j = Math.floor(Math.random() * (i + 1));
-        [items[i], items[j]] = [items[j], items[i]];
+      const { data, error } = await this.supabase.rpc('get_random_questions', {
+        p_count: count,
+        p_genres: categories.length > 0 ? categories : null,
+        p_exclude_ids: excludeIds.length > 0 ? excludeIds : null,
+      });
+
+      if (error) {
+        console.error('Erreur Supabase RPC:', error.message);
+        return this.fallbackFetch(count, categories, excludeIds);
       }
-      
-      const selectedQuestions = items.slice(0, count);
 
-      // --- MAGIE ICI : On enrichit les questions avec les URLs signées ---
-      const enrichedQuestions = await Promise.all(selectedQuestions.map(async (q) => {
-        // Si c'est une question image et qu'on a une clé dans mediaUrl
-        if (q.type === 'image' && q.mediaUrl) {
-            try {
-                // On génère une URL temporaire valide 1 heure (3600s)
-                const command = new GetObjectCommand({
-                    Bucket: this.bucketName,
-                    Key: q.mediaUrl,
-                });
-                const signedUrl = await getSignedUrl(this.s3Client, command, { expiresIn: 3600 });
-                
-                // On remplace la clé par l'URL complète pour le front
-                return { ...q, image: signedUrl }; 
-            } catch (err) {
-                console.error(`Erreur S3 pour ${q.mediaUrl}:`, err);
-                return q; // On renvoie la question sans image en cas d'erreur
-            }
-        }
-        return q;
-      }));
-
-      return enrichedQuestions;
-
+      return this.enrichWithImages(data || []);
     } catch (error) {
-      console.error('Erreur DynamoDB:', error);
+      console.error('Erreur fetchRandomQuestions:', error);
       return [];
     }
+  }
+
+  /**
+   * Fetch distinct genre values for category selection.
+   */
+  async fetchDistinctGenres(): Promise<string[]> {
+    try {
+      const { data, error } = await this.supabase.rpc('get_distinct_genres');
+
+      if (error) {
+        console.error('Erreur fetchDistinctGenres:', error.message);
+        // Fallback: query distinct genres directly
+        const { data: fallbackData } = await this.supabase
+          .from('questions')
+          .select('genre')
+          .order('genre');
+
+        if (fallbackData) {
+          const genres = new Set(fallbackData.map((r: any) => r.genre));
+          return Array.from(genres);
+        }
+        return [];
+      }
+
+      return (data || []).map((r: any) => r.genre);
+    } catch (error) {
+      console.error('Erreur fetchDistinctGenres:', error);
+      return [];
+    }
+  }
+
+  // --- Private helpers ---
+
+  /**
+   * Fallback if the RPC function doesn't exist yet.
+   */
+  private async fallbackFetch(
+    count: number,
+    categories: string[],
+    excludeIds: string[],
+  ): Promise<Question[]> {
+    let query = this.supabase.from('questions').select('*');
+
+    if (categories.length > 0) {
+      query = query.in('genre', categories);
+    }
+
+    if (excludeIds.length > 0) {
+      query = query.not('id', 'in', `(${excludeIds.join(',')})`);
+    }
+
+    // Fetch more than needed to allow random selection after filtering
+    const { data, error } = await query.limit(count * 5);
+
+    if (error || !data) {
+      console.error('Erreur fallback fetch:', error?.message);
+      return [];
+    }
+
+    // Shuffle and take count
+    for (let i = data.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [data[i], data[j]] = [data[j], data[i]];
+    }
+
+    return this.enrichWithImages(data.slice(0, count));
+  }
+
+  /**
+   * For image-type questions, generate public URLs from Supabase Storage.
+   */
+  private enrichWithImages(questions: any[]): Question[] {
+    return questions.map(q => {
+      const question: Question = {
+        id: q.id,
+        question: q.question,
+        answer: q.answer,
+        points: q.points || 1,
+        genre: q.genre || 'Général',
+        type: q.type || 'text',
+        mediaUrl: q.media_url,
+      };
+
+      // Generate public URL for image questions
+      if (question.type === 'image' && question.mediaUrl) {
+        if (question.mediaUrl.startsWith('http')) {
+          question.image = question.mediaUrl;
+        } else {
+          const { data } = this.supabase.storage
+            .from(this.bucketName)
+            .getPublicUrl(question.mediaUrl);
+          question.image = data.publicUrl;
+        }
+      }
+
+      return question;
+    });
   }
 }

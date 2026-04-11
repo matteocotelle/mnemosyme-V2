@@ -1,56 +1,65 @@
 import { writable, get } from 'svelte/store';
+import { Howl } from 'howler';
 
-// Store pour savoir si le son est coupé ou non (persistant via localStorage si tu veux aller plus loin)
-export const isMuted = writable(false);
+// Persist mute state in localStorage
+const storedMute =
+	typeof window !== 'undefined' ? localStorage.getItem('mnemosyme-muted') === 'true' : false;
+export const isMuted = writable(storedMute);
 
-// La liste de tes fichiers (Mets ici les noms exacts de tes fichiers dans static/sounds)
+isMuted.subscribe((v) => {
+	if (typeof window !== 'undefined') {
+		localStorage.setItem('mnemosyme-muted', String(v));
+	}
+});
+
 const soundLibrary = {
-    click: '/sounds/click1.wav',
-    success: '/sounds/success.mp3',
-    fail: '/sounds/error.wav',
-    join: '/sounds/join.mp3',
-    win: '/sounds/win.mp3',
-    timer: '/sounds/timer-tick.mp3' // Optionnel : bruit du chrono
+	click: '/sounds/click1.wav',
+	success: '/sounds/success.mp3',
+	fail: '/sounds/error.wav',
+	join: '/sounds/join.mp3',
+	win: '/sounds/win.mp3',
+	timer: '/sounds/timer-tick.mp3',
+	'timer-urgent': '/sounds/timer-urgent.mp3',
+	whoosh: '/sounds/whoosh.mp3',
+	send: '/sounds/send.mp3',
 };
 
-// Type pour l'autocomplétion (pour ne pas se tromper de nom)
 export type SoundType = keyof typeof soundLibrary;
 
-// Cache pour éviter de recharger le fichier à chaque fois
-const audioCache = new Map<string, HTMLAudioElement>();
+const howlCache = new Map<string, Howl>();
 
-/**
- * Joue un son spécifique
- * @param type Le nom du son (ex: 'click', 'success')
- * @param volume Le volume entre 0 et 1 (défaut: 1)
- */
-export function playSound(type: SoundType, volume: number = 1) {
-    // 1. Si on est sur le serveur (SSR) ou si c'est muté, on ne fait rien
-    if (typeof window === 'undefined') return;
-    if (get(isMuted)) return;
-
-    try {
-        let audio = audioCache.get(type);
-
-        // 2. Si le son n'est pas en cache, on le crée
-        if (!audio) {
-            audio = new Audio(soundLibrary[type]);
-            audioCache.set(type, audio);
-        }
-
-        // 3. Reset du son (pour pouvoir spammer le clic) et jeu
-        audio.currentTime = 0; 
-        audio.volume = volume;
-        audio.play().catch(e => console.warn("Erreur lecture audio (autoplay bloqué ?)", e));
-        
-    } catch (err) {
-        console.error(`Impossible de jouer le son : ${type}`, err);
-    }
+function getHowl(type: SoundType): Howl {
+	let howl = howlCache.get(type);
+	if (!howl) {
+		howl = new Howl({
+			src: [soundLibrary[type]],
+			preload: false,
+			volume: 1,
+		});
+		howlCache.set(type, howl);
+	}
+	return howl;
 }
 
-/**
- * Fonction helper pour basculer le mute
- */
+export function playSound(type: SoundType, volume: number = 1) {
+	if (typeof window === 'undefined') return;
+	if (get(isMuted)) return;
+
+	try {
+		const howl = getHowl(type);
+		howl.volume(volume);
+
+		if (howl.state() === 'unloaded') {
+			howl.load();
+			howl.once('load', () => howl.play());
+		} else {
+			howl.play();
+		}
+	} catch (err) {
+		console.warn(`Son non disponible : ${type}`, err);
+	}
+}
+
 export function toggleMute() {
-    isMuted.update(m => !m);
+	isMuted.update((m) => !m);
 }

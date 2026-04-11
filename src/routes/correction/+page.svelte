@@ -1,160 +1,395 @@
 <script lang="ts">
-    import { onMount, onDestroy } from 'svelte';
-    import { goto } from '$app/navigation';
-    import { slide, scale, fade } from 'svelte/transition';
-    
-    import { socket } from '$lib/stores/socket';
-    import { game } from '$lib/stores/gameState';
-    import type { Player } from '$lib/type'; // Assure-toi que le chemin est bon (types ou type)
+	import { onMount, onDestroy } from 'svelte';
+	import { goto } from '$app/navigation';
+	import { scale, fade, fly } from 'svelte/transition';
 
-    let state: any = null; // Contient { question, players, ... }
+	import { socket } from '$lib/stores/socket';
+	import { game, resetGame } from '$lib/stores/gameState';
+	import { playSound } from '$lib/stores/sound';
+	import type { Player, GameStats } from '$lib/type';
+	import Avatar from '$lib/components/Avatar.svelte';
+	import {
+		CheckCircle,
+		XCircle,
+		MinusCircle,
+		ArrowRight,
+		CheckFat,
+		XSquare,
+		WifiSlash,
+		Crown,
+		Check,
+		Fire,
+		Lightning
+	} from 'phosphor-svelte';
 
-    // Variable réactive : Vérifie si TOUS les joueurs ont une correction (true ou false)
-    // On ignore ceux qui sont undefined ou null
-    $: allValidated = state?.players.every((p: any) => p.isCorrect === true || p.isCorrect === false) ?? false;
+	let state: any = null;
+	let prevState: any = null;
 
-    onMount(() => {
-        if (!$game.roomCode) { goto('/'); return; }
+	// Track streaks per player (socketId → current streak)
+	let playerStreaks: Map<string, number> = new Map();
+	// Score animations: socketId → { points, id }
+	let scoreAnimations: { socketId: string; points: number; id: number }[] = [];
+	let animId = 0;
 
-        // Demander l'état initial
-        socket.emit('requestCorrectionData', { roomId: $game.roomCode });
+	$: isOpinionQuestion = state?.question?.type === 'opinion';
+	$: isDrawingQuestion = state?.question?.type === 'drawing';
+	$: isTripleQuestion = state?.question?.isTriple ?? false;
+	$: effectivePoints = state?.question?.effectivePoints ?? state?.question?.points ?? 1;
+	$: allValidated = (isOpinionQuestion || isDrawingQuestion)
+		? (isOpinionQuestion ? true : state?.players.some((p: any) => p.isCorrect === true) ?? false)
+		: (state?.players.every((p: any) => p.isCorrect === true || p.isCorrect === false) ?? false);
 
-        socket.on('correctionState', (data) => {
-            state = data;
-        });
+	function detectScoreChanges(newState: any, oldState: any) {
+		if (!newState?.players || !oldState?.players) return;
+		if (newState.questionIndex !== oldState.questionIndex) return; // question changed, skip
 
-        socket.on('correctionFinished', (data: { leaderboard: Player[] }) => {
-            game.update(g => ({ ...g, leaderboard: data.leaderboard }));
-            goto('/result'); 
-        });
-    });
+		for (const player of newState.players) {
+			const prev = oldState.players.find((p: any) => p.socketId === player.socketId);
+			if (!prev) continue;
 
-    onDestroy(() => {
-        socket.off('correctionState');
-        socket.off('correctionFinished');
-    });
+			// Player just got validated as correct
+			if (player.isCorrect === true && prev.isCorrect !== true) {
+				const id = ++animId;
+				scoreAnimations = [...scoreAnimations, { socketId: player.socketId, points: effectivePoints, id }];
+				setTimeout(() => {
+					scoreAnimations = scoreAnimations.filter(a => a.id !== id);
+				}, 1200);
 
-    // Action Créateur : Valider/Invalider
-    function togglePlayer(targetSocketId: string) {
-        if (!$game.isCreator) return; 
-        socket.emit('toggleValidation', { 
-            roomId: $game.roomCode, 
-            targetSocketId 
-        });
-    }
+				// Vibrate if it's our answer being validated
+				if (player.socketId === $game.creatorSocketId) {
+					navigator?.vibrate?.(80);
+				}
+			}
+		}
+	}
 
-    // Action Créateur : Suivante
-    function nextQuestion() {
-        if (!$game.isCreator) return;
-        if (!allValidated) return; // Sécurité supplémentaire
-        socket.emit('nextCorrection', { roomId: $game.roomCode });
-    }
+	function getScoreAnim(socketId: string) {
+		return scoreAnimations.find(a => a.socketId === socketId);
+	}
+
+	onMount(() => {
+		if (!$game.roomCode || !$game.myPseudo) {
+			resetGame();
+			goto('/');
+			return;
+		}
+
+		socket.emit('requestCorrectionData', { roomId: $game.roomCode });
+
+		socket.on('correctionState', (data) => {
+			detectScoreChanges(data, state);
+			state = data;
+		});
+
+		socket.on('streakUpdate', (data: { socketId: string; playerName: string; currentStreak: number }) => {
+			playerStreaks.set(data.socketId, data.currentStreak);
+			playerStreaks = new Map(playerStreaks); // trigger reactivity
+		});
+
+		socket.on('correctionFinished', (data: { leaderboard: Player[]; stats: GameStats }) => {
+			navigator?.vibrate?.([100, 50, 100]);
+			game.update((g) => ({
+				...g,
+				leaderboard: data.leaderboard,
+				stats: data.stats
+			}));
+			goto('/result');
+		});
+	});
+
+	onDestroy(() => {
+		socket.off('correctionState');
+		socket.off('correctionFinished');
+		socket.off('streakUpdate');
+	});
+
+	function togglePlayer(targetSocketId: string) {
+		if (!$game.isCreator) return;
+		playSound('click', 0.3);
+		socket.emit('toggleValidation', {
+			roomId: $game.roomCode,
+			targetSocketId
+		});
+	}
+
+	function validateAll(isCorrect: boolean) {
+		if (!$game.isCreator) return;
+		playSound(isCorrect ? 'success' : 'fail', 0.4);
+		socket.emit('validateAll', {
+			roomId: $game.roomCode,
+			isCorrect
+		});
+	}
+
+	function nextQuestion() {
+		if (!$game.isCreator) return;
+		if (!allValidated) return;
+		playSound('click', 0.5);
+		socket.emit('nextCorrection', { roomId: $game.roomCode });
+	}
+
+	function getStreak(socketId: string): number {
+		return playerStreaks.get(socketId) || 0;
+	}
 </script>
 
-<div class="min-h-screen bg-gradient-to-br from-slate-900 to-brand-dark text-white p-4 pb-24">
-    
-    <header class="text-center mb-6">
-        <h1 class="text-brand-primary font-bold tracking-widest text-sm uppercase mb-2">Correction</h1>
-        {#if state}
-            <h2 class="text-2xl font-bold">Question {state.questionIndex + 1} <span class="text-slate-500">/ {state.total}</span></h2>
-        {:else}
-            <p class="animate-pulse">Chargement...</p>
-        {/if}
-    </header>
+<div class="min-h-dvh flex flex-col px-4 pt-5 pb-24">
+	<!-- Header -->
+	<header class="text-center mb-5">
+		<p class="text-primary font-heading font-semibold text-sm uppercase tracking-wider mb-1">
+			Correction
+		</p>
+		{#if state}
+			<h2 class="text-xl font-heading font-bold">
+				Question {state.questionIndex + 1}
+				<span class="text-text-muted font-normal">/ {state.total}</span>
+			</h2>
+			<!-- Progress dots -->
+			<div class="flex items-center justify-center gap-1.5 mt-3">
+				{#each Array(state.total) as _, i}
+					<div
+						class="w-2 h-2 rounded-full transition-colors duration-200
+						{i < state.questionIndex
+							? 'bg-success'
+							: i === state.questionIndex
+								? 'bg-primary'
+								: 'bg-surface-light'}"
+					></div>
+				{/each}
+			</div>
+		{:else}
+			<p class="text-text-muted animate-pulse">Chargement...</p>
+		{/if}
+	</header>
 
-    {#if state}
-        <div class="max-w-2xl mx-auto space-y-8" in:fade>
-            
-            <div class="relative bg-white/5 border border-white/10 rounded-2xl p-6 text-center shadow-xl backdrop-blur-sm">
-                
-                <div class="absolute top-4 right-4 bg-yellow-500/20 text-yellow-400 text-xs font-bold px-3 py-1 rounded-full border border-yellow-500/30">
-                    {state.question.points} Pts
-                </div>
+	{#if state}
+		<div class="max-w-lg mx-auto w-full space-y-5" in:fade={{ duration: 200 }}>
+			<!-- Question card -->
+			<div class="card p-5 text-center {isTripleQuestion ? 'border border-secondary/30' : ''}">
+				{#if isTripleQuestion}
+					<div class="inline-flex items-center gap-1 bg-secondary/15 text-secondary font-heading font-bold text-xs px-2.5 py-1 rounded-lg border border-secondary/30 mb-3">
+						<Lightning size={14} weight="fill" />
+						x3
+					</div>
+				{/if}
+				<h3 class="text-lg font-heading font-semibold mb-3">{state.question.text}</h3>
 
-                <h3 class="text-xl font-medium mb-4 mt-2">{state.question.text}</h3>
-                
-                {#if state.question.image}
-                    <img src={state.question.image} alt="Question" class="mx-auto h-40 rounded-lg mb-4 object-cover"/>
-                {/if}
+				{#if state.question.image}
+					<img
+						src={state.question.image}
+						alt="Question"
+						class="mx-auto h-36 rounded-xl mb-3 object-cover"
+					/>
+				{/if}
 
-                <div class="bg-green-500/20 border border-green-500/50 rounded-xl p-3 inline-block">
-                    <span class="text-green-400 text-sm uppercase font-bold block mb-1">Bonne réponse</span>
-                    <span class="text-white font-bold text-lg">{state.question.answer}</span>
-                </div>
-            </div>
+				{#if state.question.type === 'drawing'}
+					<!-- Drawing: no correct answer, just points -->
+					<span class="inline-flex items-center bg-secondary/15 text-secondary text-xs font-semibold px-2.5 py-1 rounded-lg">
+						{effectivePoints} pt{effectivePoints > 1 ? 's' : ''} pour le gagnant
+					</span>
+				{:else if state.question.type === 'opinion' && state.opinionResult}
+					<!-- Opinion result: vote bars -->
+					<p class="text-accent text-xs font-medium uppercase tracking-wider mb-3">
+						{state.opinionResult.isTie ? 'Égalité — tout le monde marque !' : 'La majorité a choisi :'}
+					</p>
+					<div class="space-y-2">
+						{#each state.opinionResult.votes as vote}
+							{@const totalVotes = state.opinionResult.votes.reduce((s: number, v: any) => s + v.count, 0)}
+							{@const pct = totalVotes > 0 ? Math.round((vote.count / totalVotes) * 100) : 0}
+							{@const isWinner = state.opinionResult.isTie || vote.choice === state.opinionResult.majorityChoice}
+							<div class="relative rounded-xl overflow-hidden border {isWinner ? 'border-success/30' : 'border-white/10'}">
+								<div
+									class="absolute inset-0 {isWinner ? 'bg-success/15' : 'bg-surface-light/50'}"
+									style="width: {pct}%;"
+								></div>
+								<div class="relative flex items-center justify-between px-4 py-3">
+									<span class="font-heading font-semibold text-sm {isWinner ? 'text-success' : 'text-text-muted'}">
+										{#if isWinner}<Check size={14} weight="bold" class="inline mr-1" />{/if}
+										{vote.choice}
+									</span>
+									<span class="font-heading font-bold text-sm {isWinner ? 'text-success' : 'text-text-muted'}">
+										{vote.count} vote{vote.count > 1 ? 's' : ''} ({pct}%)
+									</span>
+								</div>
+							</div>
+						{/each}
+					</div>
+					<span class="inline-flex items-center bg-secondary/15 text-secondary text-xs font-semibold px-2.5 py-1 rounded-lg mt-3">
+						{effectivePoints} pt{effectivePoints > 1 ? 's' : ''}
+					</span>
+				{:else}
+					<!-- Normal question: show correct answer -->
+					<div class="flex items-center justify-center gap-3 flex-wrap">
+						<span
+							class="inline-flex items-center gap-1.5 bg-success/15 text-success text-sm font-semibold px-3 py-1.5 rounded-xl border border-success/20"
+						>
+							<Check size={16} weight="bold" />
+							{state.question.answer}
+						</span>
+						<span
+							class="inline-flex items-center bg-secondary/15 text-secondary text-xs font-semibold px-2.5 py-1 rounded-lg"
+						>
+							{effectivePoints} pt{effectivePoints > 1 ? 's' : ''}
+						</span>
+					</div>
+				{/if}
+			</div>
 
-            <div class="grid grid-cols-1 gap-3">
-                {#each state.players as player (player.socketId)}
-                    <button 
-                        disabled={!$game.isCreator}
-                        on:click={() => togglePlayer(player.socketId)}
-                        class="relative w-full text-left group transition-all duration-200 active:scale-95 
-                        {player.isDisconnected ? 'opacity-50 grayscale' : ''}" >
-                        <div class="
-                            flex items-center justify-between p-4 rounded-xl border-2 shadow-lg transition-colors
-                            {player.isCorrect === true ? 'bg-green-900/40 border-green-500' : 
-                             player.isCorrect === false ? 'bg-red-900/40 border-red-500' : 
-                             'bg-slate-800 border-slate-700'}
-                        ">
-                            <div class="flex-grow">
-                                <div class="flex items-center gap-2 mb-1">
-                                    <span class="font-bold text-slate-200">{player.name}</span>
-                                    {#if player.isDisconnected}
-                                        <span class="text-[10px] bg-slate-600 text-white px-1.5 py-0.5 rounded border border-slate-500">OFFLINE</span>
-                                    {/if}
+			<!-- Bulk actions (creator only, not for opinion/drawing questions) -->
+			{#if $game.isCreator && !isOpinionQuestion && !isDrawingQuestion}
+				<div class="flex items-center gap-2">
+					<button
+						on:click={() => validateAll(true)}
+						class="flex-1 btn-secondary flex items-center justify-center gap-1.5 py-2 text-sm text-success border-success/20"
+					>
+						<CheckFat size={16} weight="bold" />
+						Tout valider
+					</button>
+					<button
+						on:click={() => validateAll(false)}
+						class="flex-1 btn-secondary flex items-center justify-center gap-1.5 py-2 text-sm text-error border-error/20"
+					>
+						<XSquare size={16} weight="bold" />
+						Tout refuser
+					</button>
+				</div>
+			{/if}
 
-                                    {#if player.socketId === $game.creatorSocketId}
-                                        <span class="text-xs bg-yellow-500/20 text-yellow-500 px-1 rounded">Hôte</span>
-                                    {/if}
-                                </div>
-                                <p class="text-lg font-medium text-white truncate pr-2">
-                                    {player.answer}
-                                </p>
-                            </div>
+			<!-- Drawing mode hint -->
+			{#if isDrawingQuestion && $game.isCreator}
+				<p class="text-accent text-xs text-center font-medium">
+					Choisis le meilleur dessin !
+				</p>
+			{/if}
 
-                            <div class="flex-shrink-0 w-10 h-10 flex items-center justify-center rounded-full bg-black/20">
-                                {#if player.isCorrect === true}
-                                    <span class="text-2xl" in:scale>✅</span>
-                                {:else if player.isCorrect === false}
-                                    <span class="text-2xl" in:scale>❌</span>
-                                {:else}
-                                    <span class="text-slate-500 text-xl">?</span>
-                                {/if}
-                            </div>
-                        </div>
-                        
-                        {#if $game.isCreator}
-                            <div class="absolute inset-0 rounded-xl ring-2 ring-white/0 group-hover:ring-white/20 transition-all pointer-events-none"></div>
-                        {/if}
-                    </button>
-                {/each}
-            </div>
+			<!-- Player answers -->
+			<div class="space-y-2">
+				{#each state.players as player (player.socketId)}
+					<button
+						disabled={!$game.isCreator || isOpinionQuestion}
+						on:click={() => togglePlayer(player.socketId)}
+						class="w-full text-left transition-transform duration-150 active:scale-[0.97]
+							   {player.isDisconnected ? 'opacity-50' : ''}"
+					>
+						<div
+							class="card flex {isDrawingQuestion ? 'flex-col' : 'flex-row items-center'} gap-3 p-3 border-l-4 transition-colors duration-150
+							{player.isCorrect === true
+								? 'border-l-success bg-success/5'
+								: player.isCorrect === false
+									? 'border-l-error bg-error/5'
+									: 'border-l-surface-light'}"
+						>
+							<!-- Player info row -->
+							<div class="flex items-center gap-3 {isDrawingQuestion ? 'w-full' : 'flex-1 min-w-0'}">
+								<div class="relative shrink-0">
+									<Avatar seed={player.avatar || player.name} size={36} />
+									{#if getScoreAnim(player.socketId)}
+										<span
+											class="score-float absolute -top-2 left-1/2 -translate-x-1/2 font-heading font-bold text-sm text-success pointer-events-none"
+										>
+											+{getScoreAnim(player.socketId)?.points}
+										</span>
+									{/if}
+								</div>
 
-        </div>
-    {/if}
+								<div class="flex-1 min-w-0">
+									<div class="flex items-center gap-1.5 mb-0.5">
+										<span class="font-medium text-sm truncate">{player.name}</span>
+										{#if getStreak(player.socketId) >= 3}
+											<span class="inline-flex items-center gap-0.5 text-xs font-bold text-secondary shrink-0">
+												<Fire size={13} weight="fill" class="text-secondary" />
+												{getStreak(player.socketId)}
+											</span>
+										{/if}
+										{#if player.isDisconnected}
+											<WifiSlash size={12} class="text-text-muted shrink-0" />
+										{/if}
+										{#if player.socketId === $game.creatorSocketId}
+											<Crown size={12} weight="fill" class="text-secondary shrink-0" />
+										{/if}
+									</div>
+									{#if !isDrawingQuestion}
+										<p class="text-base truncate">{player.answer}</p>
+									{/if}
+								</div>
 
-    {#if $game.isCreator}
-        <div class="fixed bottom-0 left-0 right-0 p-4 bg-slate-900/90 backdrop-blur-md border-t border-white/10 z-20">
-            <div class="max-w-2xl mx-auto">
-                <button 
-                    on:click={nextQuestion}
-                    disabled={!allValidated}
-                    class="w-full font-bold text-xl py-4 rounded-xl transition-all duration-300 flex items-center justify-center gap-2
-                    {!allValidated 
-                        ? 'bg-slate-700 text-slate-400 cursor-not-allowed border border-slate-600' 
-                        : 'bg-brand-primary hover:bg-indigo-500 text-white shadow-lg shadow-indigo-500/30 active:scale-95'}"
-                >
-                    {#if !allValidated}
-                        <span>Corrigez tout le monde d'abord</span>
-                    {:else}
-                        <span>Valider & Suivant ➔</span>
-                    {/if}
-                </button>
-            </div>
-        </div>
-    {:else}
-        <div class="fixed bottom-0 left-0 right-0 p-4 bg-slate-900/90 backdrop-blur-md border-t border-white/10 z-20 text-center text-slate-400">
-            En attente du correcteur...
-        </div>
-    {/if}
+								<!-- Validation icon -->
+								<div class="shrink-0">
+									{#if player.isCorrect === true}
+										<div in:scale={{ duration: 150 }}>
+											<CheckCircle size={28} weight="fill" class="text-success" />
+										</div>
+									{:else if player.isCorrect === false}
+										<div in:scale={{ duration: 150 }}>
+											<XCircle size={28} weight="fill" class="text-error" />
+										</div>
+									{:else}
+										<MinusCircle size={28} weight="regular" class="text-text-muted" />
+									{/if}
+								</div>
+							</div>
+
+							<!-- Drawing image -->
+							{#if isDrawingQuestion && player.answer && player.answer.startsWith('data:')}
+								<img
+									src={player.answer}
+									alt="Dessin de {player.name}"
+									class="w-full rounded-xl border border-white/10"
+								/>
+							{:else if isDrawingQuestion}
+								<div class="w-full h-24 rounded-xl bg-surface-light flex items-center justify-center text-text-muted text-sm">
+									Pas de dessin
+								</div>
+							{/if}
+						</div>
+					</button>
+				{/each}
+			</div>
+		</div>
+	{/if}
+
+	<!-- Footer -->
+	<div class="fixed bottom-0 left-0 right-0 p-4 bg-background/95 border-t border-white/5 z-20">
+		<div class="max-w-lg mx-auto">
+			{#if $game.isCreator}
+				<button
+					on:click={nextQuestion}
+					disabled={!allValidated}
+					class="w-full font-heading font-semibold text-base py-3.5 rounded-xl transition-all duration-200
+						   flex items-center justify-center gap-2
+					{!allValidated
+						? 'bg-surface text-text-muted cursor-not-allowed border border-white/5'
+						: 'btn-primary'}"
+				>
+					{#if !allValidated}
+						Corrigez toutes les réponses
+					{:else}
+						Suivant
+						<ArrowRight size={18} weight="bold" />
+					{/if}
+				</button>
+			{:else}
+				<div class="text-center text-text-muted text-sm py-3">
+					En attente du correcteur...
+				</div>
+			{/if}
+		</div>
+	</div>
 </div>
+
+<style>
+	.score-float {
+		animation: floatUp 1.2s ease-out forwards;
+	}
+
+	@keyframes floatUp {
+		0% {
+			opacity: 1;
+			transform: translateX(-50%) translateY(0);
+		}
+		100% {
+			opacity: 0;
+			transform: translateX(-50%) translateY(-28px);
+		}
+	}
+</style>

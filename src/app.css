@@ -1,3 +1,45 @@
 @import "tailwindcss/base";
 @import "tailwindcss/components";
 @import "tailwindcss/utilities";
+
+@layer base {
+	* {
+		-webkit-tap-highlight-color: transparent;
+	}
+
+	html {
+		-webkit-font-smoothing: antialiased;
+		-moz-osx-font-smoothing: grayscale;
+	}
+
+	body {
+		min-height: 100dvh;
+		overscroll-behavior: none;
+	}
+
+	input, textarea {
+		font-size: 16px; /* Prevent iOS zoom on focus */
+	}
+}
+
+@layer components {
+	.card {
+		@apply bg-surface rounded-2xl border border-white/5 shadow-lg;
+	}
+
+	.btn-primary {
+		@apply bg-primary text-white rounded-xl font-heading font-semibold
+		       px-6 py-3 min-h-[48px] active:scale-[0.97] transition-transform duration-150;
+	}
+
+	.btn-secondary {
+		@apply bg-surface-light text-text-muted border border-white/10 rounded-xl
+		       font-heading font-medium px-6 py-3 min-h-[48px] active:scale-[0.97] transition-transform duration-150;
+	}
+
+	.input {
+		@apply bg-surface border border-white/10 rounded-xl text-white px-4 py-3
+		       placeholder:text-text-muted/60 focus:outline-none focus:ring-2 focus:ring-primary/50
+		       transition-shadow duration-200;
+	}
+}

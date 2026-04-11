@@ -1,8 +1,11 @@
 import { Module } from '@nestjs/common';
 import { QuestionsService } from './questions.service';
+import { CategoryCacheService } from './category-cache.service';
+import { AdminController } from './admin.controller';
 
 @Module({
-  providers: [QuestionsService],
-  exports: [QuestionsService], // On exporte le service pour l'utiliser dans GameModule
+  controllers: [AdminController],
+  providers: [QuestionsService, CategoryCacheService],
+  exports: [QuestionsService, CategoryCacheService],
 })
 export class QuestionsModule {}
